@@ -1,4 +1,5 @@
-function reg2mask,fitsfile,regfile,outfile=outfile,notype=notype
+function reg2mask,fitsfile,regfile,outfile=outfile,notype=notype,$
+      rapanda=rapanda
 
 
 fits_read,fitsfile,im,header
@@ -146,6 +147,55 @@ for ir=0,n_elements(type)-1 do begin
       for k=0,n_elements(ang)-1 do $
             xy[k,*]=[[cos(rang),sin(rang)],[-sin(rang),cos(rang)]]#$
                 [r1*cos(ang[k]),r2*sin(ang[k])]+[x,y]
+      end
+    'panda': begin
+      if wcs then begin
+        sexi=strsplit(params[0+np],':',/extract)
+        if n_elements(sexi) gt 1 then $
+            ra=15*ten(float(sexi[0]),float(sexi[1]),float(sexi[2])) $
+               else ra=float(params[0+np])
+        sexi=strsplit(params[1+np],':',/extract)
+        if n_elements(sexi) gt 1 then $
+            dec=ten(float(sexi[0]),float(sexi[1]),float(sexi[2])) $
+               else dec=float(params[1+np])
+        adxy,header,ra,dec,x,y
+        unit=strmid(params[5+np],strlen(params[5+np])-1,1)
+        r1=float(strmid(params[5+np],0,strlen(params[5+np])-1))
+        if unit eq '"' then r1=r1/3600. else if unit eq "'" then r1=r1/60. $
+              else stop,'REG2MASK: arcmin or arcsec unit expected.'
+        r1=r1/dy
+        unit=strmid(params[6+np],strlen(params[6+np])-1,1)
+        r2=float(strmid(params[6+np],0,strlen(params[6+np])-1))
+        if unit eq '"' then r2=r2/3600. else if unit eq "'" then r2=r2/60. $
+              else stop,'REG2MASK: arcmin or arcsec unit expected.'
+        r2=r2/dy
+        x=x+1
+        y=y+1
+      endif else begin
+        x=float(params[0+np])
+        y=float(params[1+np])
+        r1=float(params[5+np])
+        r2=float(params[6+np])
+      endelse
+      rang1=(float(params[2+np])+rotang)*!pi/180.
+      rang2=(float(params[3+np])+rotang)*!pi/180.
+      npanda=[fix(params[4+np]),fix(params[7+np])]
+      if keyword_set(rapanda) then begin
+          if size(rapanda,/type) ne 2 or n_elements(rapanda) ne 2 then $
+                stop,'REG2MASK: keyword rapanda must be a 2-element integer array'
+      endif else rapanda=[1,1]
+      dang=(rang2-rang1)/npanda[0]
+      rang1=rang1+dang*(rapanda[0]-1)
+      rang2=rang1+dang
+      dr=(r2-r1)/npanda[1]
+      r1=r1+dr*(rapanda[1]-1)
+      r2=r1+dr
+      ang=findgen(dang*180./!pi*2)/2.*!pi/180.+rang1
+      xy=fltarr(n_elements(ang)*2,2)
+      for k=0,n_elements(ang)-1 do xy[k,*]=r1*[cos(ang[k]),sin(ang[k])]+[x,y]
+      ang=reverse(ang)
+      for k=0,n_elements(ang)-1 do $
+            xy[k+n_elements(ang),*]=r2*[cos(ang[k]),sin(ang[k])]+[x,y]
       end
     'box': begin
       if wcs then begin
